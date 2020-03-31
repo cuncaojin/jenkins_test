@@ -1,28 +1,124 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
+//import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+
+def keystorePropertiesFile = new File(KEYSTORE_PROPERITIES)
+// def keystorePropertiesFile = new File(rootProject.appKeystore)
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+println(keystoreProperties)
 
 android {
     compileSdkVersion 29
     buildToolsVersion "29.0.3"
+
+    signingConfigs {
+        release {
+            if (IS_JENKINS == "false") {
+                storeFile file(keystoreProperties['storeFile'])
+            }else{
+                storeFile file(KEY_STORE_FILE_PATH_IN_SERVER)
+            }
+
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
+    }
 
     defaultConfig {
         applicationId "com.cuncaojin.jenkinstest"
         minSdkVersion 19
         targetSdkVersion 29
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
 
+        buildConfigField "boolean", "LOCAL", "false"
+        buildConfigField 'String', 'SERVER_URL', RELEASE_SERVER_URL
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        signingConfig signingConfigs.release
+    }
+
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     buildTypes {
         release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // signingConfig signingConfigs.release
+        }
+
+        debug {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // signingConfig signingConfigs.release
+
+            // 提高构建速度
+            ext.enableCrashlytics = false
+            // ext.alwaysUpdateBuildId = false
         }
     }
 
+    flavorDimensions "versiontype"
+
+    productFlavors {
+        wandoujia {
+            manifestPlaceholders = [app_name: "@string/app_name", ic_launcher: "@mipmap/ic_launcher", ic_launcher_round: "@mipmap/ic_launcher_round"]
+            applicationId "com.cuncaojin.jenkins.wandoujia"
+            resValue("bool", "isChinaEdition", "true")
+            resValue("string", "AServer", "\"http://192.168.10.25:8080/\"")
+            resValue("integer", "editionType", "1")
+            dimension "versiontype"
+        }
+
+        zhushou91 {
+            manifestPlaceholders = [app_name: "JenkinsDemo", ic_launcher: "@mipmap/ic_launcher_1", ic_launcher_round: "@mipmap/ic_launcher_round_1"]
+            applicationId "com.cuncaojin.jenkins.zhushou91"
+            resValue("bool", "isChinaEdition", "false")
+            resValue("string", "AServer", "\"http://192.168.10.25:8081/\"")
+            resValue("integer", "editionType", "2")
+            dimension "versiontype"
+            versionCode 2
+            versionName "1.0.1"
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def pf = productFlavors[0]
+            def releaseTime = releaseTime()
+            def apkName = "JenkinsTest_${pf.name}_${buildType.name}_v${pf.versionName}_${releaseTime}.apk"
+
+            // def outDirectory = output.outputFile.parent
+
+            if ("true" == IS_JENKINS) {
+                outDirectory = "D:/software/apache-tomcat-9.0.33/webapps/jenkins/apk"
+                releaseTime = JENKINS_TIME
+                apkName = "JenkinsTestAuto_${pf.name}_${buildType.name}_v${pf.versionName}_$releaseTime.apk"
+            }
+
+            // 1
+            def outputImpl = output as BaseVariantOutputImpl
+            outputImpl.outputFileName = apkName
+
+            // 2
+            // outputFileName = new File(outDirectory, apkName)
+        }
+    }
+}
+
+static def releaseTime() {
+    return new Date().format("yyyyMMddHHmm", TimeZone.getTimeZone("GMT+08:00"))
 }
 
 dependencies {
