@@ -7,6 +7,7 @@
         android:icon="${ic_launcher}"
         android:label="${app_name}"
         android:roundIcon="${ic_launcher_round}"
+        android:fullBackupContent="@xml/backup_rulez"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity">
